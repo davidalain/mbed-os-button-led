@@ -1,0 +1,186 @@
+/*
+ * Copyright (c) 2017-2020 Arm Limited and affiliates.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+#include "mbed.h"
+#include <chrono>
+
+using namespace std::chrono;
+
+/*
+    Estado inicial: LED desligado
+
+    Em 2s:
+        Pressionar botão 1x:            Acender o LED
+        Pressionar botão 2x:            Piscar o LED com ciclo de 1s
+        Pressionar botão 3x:            Piscar o LED com ciclo de 500ms
+        Pressionar e segurar o botão:   Desligar o LED
+*/
+
+#define BT_PRESSED      0
+#define BT_NOT_PRESSED  1
+
+const int BT_PRESSED_ = 0;
+
+typedef enum LED_State_ {
+    LED_STATE_OFF,
+    LED_STATE_ON,
+    LED_STATE_BLINK_1S,
+    LED_STATE_BLINK_500MS,
+} LEDState;
+
+/*
+*    Ocorrência do botão em 2s
+*/
+typedef enum Button_State_ {
+    BUTTON_STATE_NOT_PRESSED,
+    BUTTON_STATE_PRESSED_1X,
+    BUTTON_STATE_PRESSED_2X,
+    BUTTON_STATE_PRESSED_3X,
+    BUTTON_STATE_PRESSED_HOLD,
+} ButtonState;
+
+InterruptIn button(BUTTON1);
+DigitalOut led(LED1);
+
+Timer timerButton;
+Timer timerLed;
+
+void flip()
+{
+    /*
+    static unsigned long long timeBefore = 0;
+    unsigned long long timeNow = duration_cast<milliseconds>(t.elapsed_time()).count();
+
+    if(timeNow - timeBefore >= 20){
+        led = !led;
+    }
+
+    timeBefore = timeNow;
+    */
+
+    static microseconds timeBefore_ = 0ms;
+    microseconds timeNow_ = t.elapsed_time();
+
+    if(timeNow_ - timeBefore_ >= 20ms){
+        led = !led;
+    }
+
+    timeBefore_ = timeNow_;
+}
+
+int contador = 0;
+
+void btReleased(){
+
+    
+
+}
+
+void btPressed(){
+    
+}
+
+/*
+    Estado inicial: LED desligado
+
+    Em 2s:
+        Pressionar botão 1x:            Acender o LED
+        Pressionar botão 2x:            Piscar o LED com ciclo de 1s
+        Pressionar botão 3x:            Piscar o LED com ciclo de 500ms
+        Pressionar e segurar o botão:   Desligar o LED
+*/
+
+LEDState currentLedStateMachine = LED_STATE_OFF;
+ButtonState currentButtonStateMachine = BUTTON_STATE_NOT_PRESSED;
+
+void blink(DigitalOut& led, milliseconds t){
+    led = 1;
+    ThisThread::sleep_for(t/2);
+    led = 0;
+    ThisThread::sleep_for(t/2);
+}
+
+ButtonState getButtonState(){
+
+    ButtonState btState = ;
+
+    switch(currentButtonStateMachine){
+            default:
+            case BUTTON_STATE_NOT_PRESSED:
+            {
+                if(timerButton.elapsed_time() >= 2s){
+                    timerButton.stop();
+                    timerButton.reset();
+                    btState = BUTTON_STATE_PRESSED_HOLD;
+                }
+
+                break; //Não muda de estado
+            }
+            case BUTTON_STATE_PRESSED_1X:
+            {
+                currentLedStateMachine = LED_STATE_ON;
+                break;
+            }
+            case BUTTON_STATE_PRESSED_2X:
+            {
+                currentLedStateMachine = LED_STATE_BLINK_1S;
+                break;
+            }
+            case BUTTON_STATE_PRESSED_3X:
+            {
+                currentLedStateMachine = LED_STATE_BLINK_500MS;
+                break;
+            }
+            case BUTTON_STATE_PRESSED_HOLD:
+            {
+                currentLedStateMachine = LED_STATE_OFF;
+                break;
+            }
+        }
+
+        return btState;
+}
+
+int main()
+{
+    //t.start();
+
+    //rise: 0 -> 1 // BT_PRESSED -> BT_NOT_PRESSED (quando solta o botão)
+    button.rise(&btReleased);
+
+    //fall: 1 -> 0 // BT_NOT_PRESSED -> BT_PRESSED (quando aperta o botão)
+    button.fall(&btPressed);
+    
+    while (true) {          // wait around, interrupts will interrupt this!
+
+        currentButtonStateMachine = getButtonState();
+
+        switch(currentLedStateMachine){
+            default:
+            case LED_STATE_OFF:
+            {
+                led = 0;
+                break;
+            }
+            case LED_STATE_ON:
+            {
+                led = 1;
+                break;
+            }
+            case LED_STATE_BLINK_1S:
+            {
+                blink(led, 1s);
+                break;
+            }
+            case LED_STATE_BLINK_500MS:
+            {
+                blink(led, 500ms);
+                break;
+            }
+        }
+        
+        ThisThread::sleep_for(250ms);
+    }
+}
